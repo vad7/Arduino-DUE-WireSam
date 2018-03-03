@@ -1,4 +1,4 @@
-# Arduino DUE WireSam library
+# Arduino DUE WireSam, extEEPROM, DS3232 libraries
 
 Arduino DUE TwoWire (I2C), EEPROM-FRAM, RTC libraries.<br>
 Using interrupts.<br>
