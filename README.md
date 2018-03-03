@@ -9,7 +9,9 @@ Support non-blocking mode.
 
 Included modified extEERPOM and DS3232RTC libraries.
 
-// example:
+Example: Test.ino
+
+Using:
 #include "WireSam.h"
 #include "extEEPROM.h"
 #include "DS3232RTC.h"
@@ -17,3 +19,5 @@ Included modified extEERPOM and DS3232RTC libraries.
 // Inits:
 extEEPROM eepromI2C(eeprom_size_in_kbit, number_of_eeprom_chips, eeprom_page_size, eeprom_base_address, is_it_FRAM_memory);
 DS3232RTC rtcI2C;
+
+
