@@ -37,6 +37,10 @@ TwoWire::TwoWire(Twi *_twi, void(*_beginCb)(void), void(*_endCb)(void)) :
 }
 
 void TwoWire::begin(void) {
+	// TwoWire interrupt run at lower priority than other arduino interrupts
+	if(NVIC_GetPriorityGrouping() == 0) {
+		NVIC_SetPriorityGrouping(3); // Groups 16, Sub 1
+	}
 	if(onBeginCallback) onBeginCallback();
 
  //   if(status == MASTER_IDLE) return; // skip multiply init

@@ -56,6 +56,9 @@
 #include <extEEPROM.h>
 #include <WireSam.h>
 
+extern void _delay(int ms); // RTOS external delay - 1 ms
+#define RTOS_delay(ms) _delay(ms)
+
 // Constructor.
 // - deviceCapacity is the capacity of a single EEPROM device in
 //   kilobits (kb) and should be one of the values defined in the
@@ -77,6 +80,7 @@ extEEPROM::extEEPROM(eeprom_size_t deviceCapacity, byte nDevice, uint32_t pageSi
     _totalCapacity = _nDevice * _dvcCapacity;
 #ifdef USE_RTOS_DELAY_AFTER_BYTES
     DelayAfterBytes = USE_RTOS_DELAY_AFTER_BYTES;
+    use_RTOS_delay = 0;
 #endif
 
     //determine the bitshift needed to isolate the chip select bits from the address to put into the control byte
@@ -145,7 +149,7 @@ byte extEEPROM::write(unsigned long addr, byte *values, unsigned int nBytes)
 
 #ifdef USE_RTOS_DELAY_AFTER_BYTES
         // non-blocking
-       	if((txStatus = Wire.endTransmission(nWrite > DelayAfterBytes))) return txStatus; // choice RTOS delay(1) or not
+       	if((txStatus = Wire.endTransmission(use_RTOS_delay && nWrite > DelayAfterBytes))) return txStatus; // choice RTOS delay(1) or not
 #else
        	if((txStatus = Wire.endTransmission(0))) return txStatus;
 #endif
@@ -155,8 +159,9 @@ byte extEEPROM::write(unsigned long addr, byte *values, unsigned int nBytes)
               Wire.beginTransmission(ctrlByte);
               if (_nAddrBytes == 2) Wire.write(0);        //high addr byte
               Wire.write(0);                              //low addr byte
-              txStatus = Wire.endTransmission(1);         // with delay 1 ms
+              txStatus = Wire.endTransmission(0);         // without delay
               if(txStatus == 0) break; 					  // success? - end
+              RTOS_delay(1);
            }
            if(txStatus) return txStatus;
         }
@@ -191,7 +196,7 @@ byte extEEPROM::read(unsigned long addr, byte *values, unsigned int nBytes)
         Wire.write( (byte) addr );                                //low addr byte
 
 #ifdef USE_RTOS_DELAY_AFTER_BYTES
-        if((rxStatus = Wire.endTransmissionReceive(values, nRead, nRead > DelayAfterBytes))) return rxStatus; // choice RTOS delay(1) or not
+        if((rxStatus = Wire.endTransmissionReceive(values, nRead, use_RTOS_delay && nRead > DelayAfterBytes))) return rxStatus; // choice RTOS delay(1) or not
 #else
         if((rxStatus = Wire.endTransmissionReceive(values, nRead, 0))) return rxStatus;
 #endif

@@ -90,6 +90,8 @@ class extEEPROM
         byte read(unsigned long addr, byte *values, unsigned int nBytes);
         int read(unsigned long addr);
 
+        uint8_t use_RTOS_delay;
+
     private:
         uint8_t _eepromAddr;            //eeprom i2c address
         uint32_t _dvcCapacity;          //capacity of one EEPROM device, in bytes

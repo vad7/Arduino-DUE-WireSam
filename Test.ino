@@ -238,18 +238,41 @@ void setup() {
 
 */
 
-	//Serial.print("t_"); Serial.print(micros());
-	st = eepromI2C.read(0, buffer, 1024);
-	//M = micros(); Serial.print("-"); Serial.println(M);
-	if(st) { Serial.print("Read 1, 1000: "); Serial.println(st); }
-	if(st == 0) {
-	   	for(i = 0; i < 16; i++) {
-	   		for(uint j = 0; j < 64; j++) {
-		   		Serial.print(buffer[i * 64 + j], HEX); Serial.print(" ");
-	   		}
-	   		Serial.print("\n");
-	   	}
+
+	uint32_t eeprom_size = 4096;
+
+	Serial.println("Erasing all eeprom...");
+	memset(buffer, 0xFF, sizeof(buffer));
+	for(uint16_t i = 0; i < eeprom_size / sizeof(buffer); i++) {
+		if(st = eepromI2C.write(i * sizeof(buffer), buffer, sizeof(buffer))) {
+		   Serial.print("\nError write at: ");
+		   Serial.println(i * sizeof(buffer));
+		   break;
+		}
 	}
+
+
+
+	//dump memory
+	    Serial.println("Dump EEPROM from 0x0000:");
+		for(uint16_t _i = 0; _i < eeprom_size / 64; _i++) {
+			uint8_t _st;
+			if((_st = eepromI2C.read(_i * 64, (byte*)buffer, 64))) {
+			   Serial.print("\nRead EEPROM error at: ");
+			   Serial.println(_i * 64);
+			   break;
+			}
+			for(uint8_t _j = 0; _j < 64; _j++) {
+				_st =  buffer[_j];
+				if(_st <= 0x0F) Serial.print('0');
+				Serial.print(_st, HEX); Serial.print(' ');
+			}
+			Serial.println();
+			WDT_Restart(WDT);
+		}
+	////dump memory
+
+
 //*/
 
 	delay(500);
