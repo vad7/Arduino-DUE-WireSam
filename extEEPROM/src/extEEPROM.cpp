@@ -126,18 +126,18 @@ byte extEEPROM::begin(unsigned int twiFreq)
 //If the I/O would extend past the top of the EEPROM address space,
 //a status of EEPROM_ADDR_ERR is returned. For I2C errors, the status
 //from the Arduino Wire library is passed back through to the caller.
-byte extEEPROM::write(unsigned long addr, byte *values, unsigned int nBytes)
+byte extEEPROM::write(uint32_t addr, byte *values, uint32_t nBytes)
 {
     uint8_t ctrlByte;       //control byte (I2C device address & chip/block select bits)
     uint8_t txStatus = 0;   //transmit status
-    uint16_t nWrite;        //number of bytes to write
+    uint32_t nWrite;        //number of bytes to write
 
     if (addr + nBytes > _totalCapacity) {   //will this write go past the top of the EEPROM?
         return EEPROM_ADDR_ERR;             //yes, tell the caller
     }
 
-    while (nBytes > 0) {
-   		uint16_t nPage;         //number of bytes remaining on current page, starting at addr
+    while(nBytes > 0) {
+   		uint32_t nPage;         //number of bytes remaining on current page, starting at addr
    		nPage = _pageSize - ( addr & (_pageSize - 1) );
    		//find min(nBytes, nPage, BUFFER_LENGTH) -- BUFFER_LENGTH is defined in the Wire library.
    		nWrite = nBytes < nPage ? nBytes : nPage;
@@ -148,20 +148,22 @@ byte extEEPROM::write(unsigned long addr, byte *values, unsigned int nBytes)
         Wire.write( (byte) addr );                               //low addr byte
 
 #ifdef USE_RTOS_DELAY_AFTER_BYTES
-        // non-blocking
-       	if((txStatus = Wire.endTransmission(use_RTOS_delay && nWrite > DelayAfterBytes))) return txStatus; // choice RTOS delay(1) or not
+        uint8_t dly = use_RTOS_delay && nWrite > DelayAfterBytes;
+       	if((txStatus = Wire.endTransmission(dly))) return txStatus; // choice RTOS delay(1) or not
 #else
        	if((txStatus = Wire.endTransmission(0))) return txStatus;
 #endif
         if(!_FRAM) {
            //wait EEPROM up to 50ms for the write to complete
            for (uint8_t i=50; i; --i) {
-              Wire.beginTransmission(ctrlByte);
-              if (_nAddrBytes == 2) Wire.write(0);        //high addr byte
-              Wire.write(0);                              //low addr byte
-              txStatus = Wire.endTransmission(0);         // without delay
-              if(txStatus == 0) break; 					  // success? - end
-              RTOS_delay(1);
+        	  if(dly) {
+        		  Wire.beginTransmission(ctrlByte);
+        		  if (_nAddrBytes == 2) Wire.write(0);        //high addr byte
+        		  Wire.write(0);                              //low addr byte
+        		  txStatus = Wire.endTransmission(0);         // without delay
+        		  if(txStatus == 0) break; 					  // success? - end
+        	  } else dly = 1;
+              if(use_RTOS_delay) RTOS_delay(1); else delayMicroseconds(300);
            }
            if(txStatus) return txStatus;
         }
@@ -175,18 +177,18 @@ byte extEEPROM::write(unsigned long addr, byte *values, unsigned int nBytes)
 
 // Read bytes from external EEPROM.
 // Success return 0, if read less than ordered return 1, otherwise error number
-byte extEEPROM::read(unsigned long addr, byte *values, unsigned int nBytes)
+byte extEEPROM::read(uint32_t addr, byte *values, uint32_t nBytes)
 {
     byte ctrlByte;
     byte rxStatus;
-    uint16_t nRead;             //number of bytes to read
+    uint32_t nRead;             //number of bytes to read
 
     if (addr + nBytes > _totalCapacity) {   //will this read take us past the top of the EEPROM?
         return EEPROM_ADDR_ERR;             //yes, tell the caller
     }
 
-    while (nBytes > 0) {
-		uint16_t nPage;             //number of bytes remaining on current page, starting at addr
+    while(nBytes > 0) {
+		uint32_t nPage;             //number of bytes remaining on current page, starting at addr
 		nPage = _dvcCapacity - ( addr & (_dvcCapacity - 1) );
 		nRead = nBytes < nPage ? nBytes : nPage;
 
@@ -200,6 +202,7 @@ byte extEEPROM::read(unsigned long addr, byte *values, unsigned int nBytes)
 #else
         if((rxStatus = Wire.endTransmissionReceive(values, nRead, 0))) return rxStatus;
 #endif
+
         if(Wire.available() != nRead) return 1;
 
         addr += nRead;          //increment the EEPROM address
@@ -213,7 +216,7 @@ byte extEEPROM::read(unsigned long addr, byte *values, unsigned int nBytes)
 //If the I/O would extend past the top of the EEPROM address space,
 //a status of EEPROM_ADDR_ERR is returned. For I2C errors, the status
 //from the Arduino Wire library is passed back through to the caller.
-byte extEEPROM::write(unsigned long addr, byte value)
+byte extEEPROM::write(uint32_t addr, byte value)
 {
 	uint8_t data = value;
     return write(addr, &data, 1);
@@ -224,7 +227,7 @@ byte extEEPROM::write(unsigned long addr, byte value)
 //a status of EEPROM_ADDR_ERR is returned. For I2C errors, the status
 //from the Arduino Wire library is passed back through to the caller.
 //To distinguish error values from valid data, error values are returned as negative numbers.
-int extEEPROM::read(unsigned long addr)
+int extEEPROM::read(uint32_t addr)
 {
     uint8_t data;
     int ret;

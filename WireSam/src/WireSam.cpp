@@ -134,12 +134,12 @@ size_t TwoWire::requestFrom(uint8_t address, uint8_t *buffer, size_t quantity, u
 		Buffer = _Buffer;
 	} else Buffer = buffer;
 
-	status = MASTER_RECV;
 	txAddress = address;
 	BufferMax = quantity;
 	BufferIndex = 0;
 	BufferLength = 0;
 	Error = 0;
+	status = MASTER_RECV;
 
 	requestFrom_start();
 
@@ -152,7 +152,6 @@ size_t TwoWire::requestFrom(uint8_t address, uint8_t *buffer, size_t quantity, u
 
 // Prepare transmission
 void TwoWire::beginTransmission(uint8_t address) {
-	status = MASTER_SEND;
 	txAddress = address;
 	_BufferIndex = 0;
 	_BufferLength = 0;
@@ -163,6 +162,7 @@ void TwoWire::beginTransmission(uint8_t address) {
 	ReceiveBuffer = NULL;
 	ReceiveLength = 0;
 	Error = 0;
+	status = MASTER_SEND;
 }
 
 // Prepare transmission
@@ -205,7 +205,7 @@ uint8_t TwoWire::endTransmissionReceive(uint8_t *buffer, size_t quantity, uint8_
 // Start transmission
 uint8_t TwoWire::endTransmissionReceive(uint8_t use_RTOS_delay)
 {
-	TWI_StartWrite(twi, txAddress, 0, 0, _BufferLength ? _Buffer[_BufferIndex++] : Buffer ? Buffer[BufferIndex++] : 0); // iaddress = 0, isize = 0
+	TWI_StartWrite(twi, txAddress, 0, 0, _BufferLength ? _Buffer[_BufferIndex++] : BufferLength ? Buffer[BufferIndex++] : 0); // iaddress = 0, isize = 0
 	TWI_EnableIt(twi, TWI_IER_TXRDY | TWI_IER_NACK);
 
 	if(use_RTOS_delay == 2) return 0; // non-blocking - exiting
@@ -242,13 +242,13 @@ size_t TwoWire::available(void) {
 }
 
 int TwoWire::read(void) {
-	if (BufferIndex < BufferLength)
+	if(BufferIndex < BufferLength)
 		return Buffer[BufferIndex++];
 	return -1;
 }
 
 int TwoWire::peek(void) {
-	if (BufferIndex < BufferLength)
+	if(BufferIndex < BufferLength)
 		return Buffer[BufferIndex];
 	return -1;
 }

@@ -83,12 +83,12 @@ const uint8_t EEPROM_ADDR_ERR = 9;
 class extEEPROM
 {
     public:
-        extEEPROM(eeprom_size_t deviceCapacity, byte nDevice, uint32_t pageSize, byte eepromAddr = 0x50, byte FRAM = 0);
+       extEEPROM(eeprom_size_t deviceCapacity, byte nDevice, uint32_t pageSize, byte eepromAddr = 0x50, byte FRAM = 0);
         byte begin(unsigned int twiFreq);  // 0 = don't set twi speed
-        byte write(unsigned long addr, byte *values, unsigned int nBytes);
-        byte write(unsigned long addr, byte value);
-        byte read(unsigned long addr, byte *values, unsigned int nBytes);
-        int read(unsigned long addr);
+        byte write(uint32_t addr, byte *values, uint32_t nBytes);
+        byte write(uint32_t addr, byte value);
+        byte read(uint32_t addr, byte *values, uint32_t nBytes);
+        int read(uint32_t addr);
 
         uint8_t use_RTOS_delay;
 
