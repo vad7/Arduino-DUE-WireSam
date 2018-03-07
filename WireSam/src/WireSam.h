@@ -62,6 +62,7 @@ public:
 
 	uint8_t TransmissionStatus(void); // 0 - in process, 1 - ok, >2 - error
 	uint8_t WaitTransmission(uint8_t use_RTOS_delay);
+//	void WaitPreviousTask(uint8_t use_RTOS_delay);
 
 	size_t write(uint8_t);
 	size_t write(const uint8_t *, size_t);
@@ -108,7 +109,7 @@ private:
 		SLAVE_RECV,
 		SLAVE_SEND
 	};
-	uint8_t status;
+	volatile uint8_t status;
 
 	// Called before initialization
 	void (*onBeginCallback)(void);

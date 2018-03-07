@@ -88,6 +88,15 @@ uint8_t TwoWire::TransmissionStatus(void) {
 	return status == MASTER_IDLE ? Error ? Error : 1 : 0;
 }
 
+/*
+inline void TwoWire::WaitPreviousTask(uint8_t use_RTOS_delay)
+{
+	while(status != MASTER_IDLE) {
+		if(use_RTOS_delay) RTOS_delay(1);
+	}
+}
+*/
+
 // Return 0 if success, otherwise error
 uint8_t TwoWire::WaitTransmission(uint8_t use_RTOS_delay)
 {
@@ -129,6 +138,8 @@ uint8_t TwoWire::requestFrom(uint8_t address, uint8_t quantity, uint8_t sendStop
 // Returns read bytes
 // use_RTOS_delay: 1 - RTOS_delay(1), 2 - exit, non-blocking, use TransmissionStatus() and available().
 size_t TwoWire::requestFrom(uint8_t address, uint8_t *buffer, size_t quantity, uint8_t use_RTOS_delay) {
+//	WaitPreviousTask(1);
+	status = MASTER_RECV;
 	if(buffer == NULL) { // use local buffer
 		if (quantity > BUFFER_LENGTH) quantity = BUFFER_LENGTH;
 		Buffer = _Buffer;
@@ -139,7 +150,6 @@ size_t TwoWire::requestFrom(uint8_t address, uint8_t *buffer, size_t quantity, u
 	BufferIndex = 0;
 	BufferLength = 0;
 	Error = 0;
-	status = MASTER_RECV;
 
 	requestFrom_start();
 
@@ -152,6 +162,8 @@ size_t TwoWire::requestFrom(uint8_t address, uint8_t *buffer, size_t quantity, u
 
 // Prepare transmission
 void TwoWire::beginTransmission(uint8_t address) {
+//	WaitPreviousTask(1);
+	status = MASTER_SEND;
 	txAddress = address;
 	_BufferIndex = 0;
 	_BufferLength = 0;
@@ -162,7 +174,6 @@ void TwoWire::beginTransmission(uint8_t address) {
 	ReceiveBuffer = NULL;
 	ReceiveLength = 0;
 	Error = 0;
-	status = MASTER_SEND;
 }
 
 // Prepare transmission
