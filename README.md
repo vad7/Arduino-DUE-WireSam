@@ -1,4 +1,4 @@
-# Arduino DUE WireSam library, extEEPROM, DS3232, DS2482 libraries
+# Arduino DUE Wire, extEEPROM, DS3232, DS2482 libraries
 
 Arduino DUE libraries for I2C devices:<br>
 1. Main Wire (I2C) class,<br>
