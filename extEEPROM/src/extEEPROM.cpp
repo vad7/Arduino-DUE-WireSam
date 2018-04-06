@@ -56,8 +56,10 @@
 #include <extEEPROM.h>
 #include <WireSam.h>
 
-extern void _delay(int ms); // RTOS external delay - 1 ms
-#define RTOS_delay(ms) _delay(ms)
+//extern void _delay(int ms); // RTOS external delay - 1 ms
+//#define RTOS_delay(ms) _delay(ms)
+#include "FreeRTOS_ARM.h"
+#define RTOS_delay(ms) { if(xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) vTaskDelay(ms/portTICK_PERIOD_MS); else delay(ms); }
 
 // Constructor.
 // - deviceCapacity is the capacity of a single EEPROM device in
@@ -163,7 +165,7 @@ byte extEEPROM::write(uint32_t addr, byte *values, uint32_t nBytes)
         		  txStatus = Wire.endTransmission(0);         // without delay
         		  if(txStatus == 0) break; 					  // success? - end
         	  } else dly = 1;
-              if(use_RTOS_delay) RTOS_delay(1); else delayMicroseconds(300);
+              if(use_RTOS_delay) { RTOS_delay(1); } else delayMicroseconds(300);
            }
            if(txStatus) return txStatus;
         }

@@ -26,8 +26,10 @@ extern "C" {
 
 #include "WireSam.h"
 
-extern void _delay(int ms); // RTOS external delay - 1 ms
-#define RTOS_delay(ms) _delay(ms)
+//extern void _delay(int ms); // RTOS external delay - 1 ms
+//#define RTOS_delay(ms) _delay(ms)
+#include "FreeRTOS_ARM.h"
+#define RTOS_delay(ms) { if(xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) vTaskDelay(ms/portTICK_PERIOD_MS); else delay(ms); }
 
 TwoWire::TwoWire(Twi *_twi, void(*_beginCb)(void), void(*_endCb)(void)) :
 	twi(_twi), txAddress(0), _BufferIndex(0), _BufferLength(0),
@@ -88,23 +90,14 @@ uint8_t TwoWire::TransmissionStatus(void) {
 	return status == MASTER_IDLE ? Error ? Error : 1 : 0;
 }
 
-/*
-inline void TwoWire::WaitPreviousTask(uint8_t use_RTOS_delay)
-{
-	while(status != MASTER_IDLE) {
-		if(use_RTOS_delay) RTOS_delay(1);
-	}
-}
-*/
-
 // Return 0 if success, otherwise error
-uint8_t TwoWire::WaitTransmission(uint8_t use_RTOS_delay)
+__attribute__((always_inline)) inline uint8_t TwoWire::WaitTransmission(uint8_t use_RTOS_delay)
 {
 	uint8_t ret;
 	uint16_t _timeout;
 	InterruptOccured = 1;
 	while((ret = TransmissionStatus()) == 0) {
-		if(use_RTOS_delay) RTOS_delay(1);
+		if(use_RTOS_delay) { RTOS_delay(1); }
 		if(InterruptOccured) {
 			_timeout = use_RTOS_delay ? I2C_TIMEOUT_MS : I2C_TIMEOUT;
 			InterruptOccured = 0;
@@ -138,8 +131,6 @@ uint8_t TwoWire::requestFrom(uint8_t address, uint8_t quantity, uint8_t sendStop
 // Returns read bytes
 // use_RTOS_delay: 1 - RTOS_delay(1), 2 - exit, non-blocking, use TransmissionStatus() and available().
 size_t TwoWire::requestFrom(uint8_t address, uint8_t *buffer, size_t quantity, uint8_t use_RTOS_delay) {
-//	WaitPreviousTask(1);
-	status = MASTER_RECV;
 	if(buffer == NULL) { // use local buffer
 		if (quantity > BUFFER_LENGTH) quantity = BUFFER_LENGTH;
 		Buffer = _Buffer;
@@ -150,20 +141,34 @@ size_t TwoWire::requestFrom(uint8_t address, uint8_t *buffer, size_t quantity, u
 	BufferIndex = 0;
 	BufferLength = 0;
 	Error = 0;
+	status = MASTER_RECV;
 
 	requestFrom_start();
 
 	if(use_RTOS_delay == 2) return 0; // non-blocking - exiting
 
-	WaitTransmission(use_RTOS_delay);
-
+	// WaitTransmission(use_RTOS_delay);
+	// use inline function:
+	uint8_t ret;
+	uint16_t _timeout;
+	InterruptOccured = 1;
+	while((ret = TransmissionStatus()) == 0) {
+		if(use_RTOS_delay) { RTOS_delay(1); }
+		if(InterruptOccured) {
+			_timeout = use_RTOS_delay ? I2C_TIMEOUT_MS : I2C_TIMEOUT;
+			InterruptOccured = 0;
+		}
+		if(--_timeout == 0) {
+			Stop();
+			break;
+		}
+	}
+	// use inline function.
 	return BufferLength;
 }
 
 // Prepare transmission
 void TwoWire::beginTransmission(uint8_t address) {
-//	WaitPreviousTask(1);
-	status = MASTER_SEND;
 	txAddress = address;
 	_BufferIndex = 0;
 	_BufferLength = 0;
@@ -174,6 +179,7 @@ void TwoWire::beginTransmission(uint8_t address) {
 	ReceiveBuffer = NULL;
 	ReceiveLength = 0;
 	Error = 0;
+	status = MASTER_SEND;
 }
 
 // Prepare transmission
@@ -190,7 +196,7 @@ void TwoWire::beginTransmission(uint8_t address, uint8_t *buffer, size_t quantit
 	return endTransmissionReceive(0);
 }*/
 
-// Start transmission
+// Start transmission, return 0 when success
 uint8_t TwoWire::endTransmission(void) {
 	return endTransmissionReceive(0);
 }
@@ -200,7 +206,7 @@ uint8_t TwoWire::endTransmission(uint8_t use_RTOS_delay) {
 	return endTransmissionReceive(use_RTOS_delay);
 }
 
-// Start transmission and receiving after
+// Start transmission and receiving after, return 0 when success
 // use_RTOS_delay: 1 - RTOS_delay(1), 2 - exit, non-blocking, use TransmissionStatus() and available().
 uint8_t TwoWire::endTransmissionReceive(uint8_t *buffer, size_t quantity, uint8_t use_RTOS_delay)
 {
@@ -213,7 +219,7 @@ uint8_t TwoWire::endTransmissionReceive(uint8_t *buffer, size_t quantity, uint8_
 	return endTransmissionReceive(use_RTOS_delay);
 }
 
-// Start transmission
+// Start transmission, return 0 when success
 uint8_t TwoWire::endTransmissionReceive(uint8_t use_RTOS_delay)
 {
 	TWI_StartWrite(twi, txAddress, 0, 0, _BufferLength ? _Buffer[_BufferIndex++] : BufferLength ? Buffer[BufferIndex++] : 0); // iaddress = 0, isize = 0
@@ -221,26 +227,59 @@ uint8_t TwoWire::endTransmissionReceive(uint8_t use_RTOS_delay)
 
 	if(use_RTOS_delay == 2) return 0; // non-blocking - exiting
 
-	return WaitTransmission(use_RTOS_delay);
-}
-
-size_t TwoWire::write(uint8_t data) {
-	uint8_t b = data;
-	return write(&b, 1);
-}
-
-size_t TwoWire::write(const uint8_t *data, size_t quantity) {
-	if (status == MASTER_SEND) {
-		for (size_t i = 0; i < quantity; ++i) {
-			if (_BufferLength >= BUFFER_LENGTH)
-				return i;
-			_Buffer[_BufferLength++] = data[i];
+	// return WaitTransmission(use_RTOS_delay);
+	// use inline function:
+	uint8_t ret;
+	uint16_t _timeout;
+	InterruptOccured = 1;
+	while((ret = TransmissionStatus()) == 0) {
+		if(use_RTOS_delay) { RTOS_delay(1); }
+		if(InterruptOccured) {
+			_timeout = use_RTOS_delay ? I2C_TIMEOUT_MS : I2C_TIMEOUT;
+			InterruptOccured = 0;
 		}
+		if(--_timeout == 0) {
+			Stop();
+			ret = 5;
+			break;
+		}
+	}
+	if(ret == 1) ret = 0;
+	return ret;
+	// use inline function.
+}
+
+// Return number of bytes added to send buffer
+size_t TwoWire::write(uint8_t data) {
+//	uint8_t b = data;
+//	return write(&b, 1);
+// Stack optimized:
+	if (status == MASTER_SEND) {
+		if (_BufferLength >= BUFFER_LENGTH)	return 0;
+		_Buffer[_BufferLength++] = data;
 /* Not need yet
 	} else {
 		for (size_t i = 0; i < quantity; ++i) {
 			if (srvBufferLength >= BUFFER_LENGTH)
 				return i;
+			srvBuffer[srvBufferLength++] = data[i];
+		}
+*/
+	}
+	return 1;
+}
+
+// Return number of bytes added to send buffer
+size_t TwoWire::write(const uint8_t *data, size_t quantity) {
+	if (status == MASTER_SEND) {
+		for (size_t i = 0; i < quantity; ++i) {
+			if (_BufferLength >= BUFFER_LENGTH) return i;
+			_Buffer[_BufferLength++] = data[i];
+		}
+/* Not need yet
+	} else {
+		for (size_t i = 0; i < quantity; ++i) {
+			if (srvBufferLength >= BUFFER_LENGTH) return i;
 			srvBuffer[srvBufferLength++] = data[i];
 		}
 */
@@ -431,7 +470,7 @@ static void Wire_Init(void) {
 
 	NVIC_DisableIRQ(WIRE_ISR_ID);
 	NVIC_ClearPendingIRQ(WIRE_ISR_ID);
-	NVIC_SetPriority(WIRE_ISR_ID, 1);
+	NVIC_SetPriority(WIRE_ISR_ID, 0);
 	NVIC_EnableIRQ(WIRE_ISR_ID);
 }
 
@@ -469,7 +508,7 @@ static void Wire1_Init(void) {
 
 	NVIC_DisableIRQ(WIRE1_ISR_ID);
 	NVIC_ClearPendingIRQ(WIRE1_ISR_ID);
-	NVIC_SetPriority(WIRE1_ISR_ID, 1);
+	NVIC_SetPriority(WIRE1_ISR_ID, 0);
 	NVIC_EnableIRQ(WIRE1_ISR_ID);
 }
 
